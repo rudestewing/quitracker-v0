@@ -1,9 +1,10 @@
-import type React from "react"
-import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
+import type React from "react";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "QuitTracker - Habit Quit Tracker",
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
     description: "Track your journey to freedom from bad habits",
   },
   generator: "v0.dev",
-}
+};
 
 export const viewport: Viewport = {
   themeColor: "#16a34a",
@@ -36,24 +37,27 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-}
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
       <head>
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
-
         {/* Favicons */}
         <link rel="icon" href="/favicon.png" type="image/svg+xml" />
-        <link rel="icon" href="/icon-192.png" type="image/svg+xml" sizes="192x192" />
+        <link
+          rel="icon"
+          href="/icon-192.png"
+          type="image/svg+xml"
+          sizes="192x192"
+        />
         <link rel="apple-touch-icon" href="/icon-192.png" />
-
         {/* PWA Meta Tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -63,13 +67,22 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="msapplication-TileImage" content="/icon-192.png" />
         <meta name="application-name" content="QuitTracker" />
-
         {/* Additional Meta Tags for better PWA support */}
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-touch-fullscreen" content="yes" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
+        <meta name="apple-touch-fullscreen" content="yes" />{" "}
       </head>
       <body className={inter.className}>
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -184,5 +197,5 @@ export default function RootLayout({
         />
       </body>
     </html>
-  )
+  );
 }
