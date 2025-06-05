@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Plus, Edit2, Trash2, Calendar, Wifi, WifiOff } from "lucide-react"
+import { Plus, Edit2, Trash2, Calendar, Wifi, WifiOff, Download, Smartphone } from "lucide-react"
 import dayjs from "dayjs"
 import duration from "dayjs/plugin/duration"
 import relativeTime from "dayjs/plugin/relativeTime"
@@ -53,6 +53,9 @@ export default function QuitTracker() {
   const [currentTime, setCurrentTime] = useState(dayjs())
   const [isOnline, setIsOnline] = useState(true)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+  const [canInstall, setCanInstall] = useState(false)
+  const [swRegistered, setSwRegistered] = useState(false)
 
   // Load items from localStorage on mount
   useEffect(() => {
@@ -75,51 +78,70 @@ export default function QuitTracker() {
     return () => clearInterval(timer)
   }, [])
 
-  // PWA installation and online status
+  // PWA and Service Worker detection
   useEffect(() => {
-    // Register service worker
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then((registration) => {
-          console.log("SW registered: ", registration)
-        })
-        .catch((registrationError) => {
-          console.log("SW registration failed: ", registrationError)
-        })
-    }
-
     // Handle online/offline status
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
 
     window.addEventListener("online", handleOnline)
     window.addEventListener("offline", handleOffline)
-
     setIsOnline(navigator.onLine)
 
-    // Handle PWA install prompt
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault()
-      setInstallPrompt(e)
+    // PWA Install Events
+    const handlePWAInstallAvailable = (e: any) => {
+      console.log("🚀 PWA install available")
+      setInstallPrompt(e.detail)
+      setCanInstall(true)
     }
 
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    const handlePWAInstalled = () => {
+      console.log("✅ PWA installed")
+      setIsInstalled(true)
+      setCanInstall(false)
+      setInstallPrompt(null)
+    }
+
+    const handlePWAAlreadyInstalled = () => {
+      console.log("✅ PWA already installed")
+      setIsInstalled(true)
+      setCanInstall(false)
+    }
+
+    window.addEventListener("pwa-install-available", handlePWAInstallAvailable)
+    window.addEventListener("pwa-installed", handlePWAInstalled)
+    window.addEventListener("pwa-already-installed", handlePWAAlreadyInstalled)
+
+    // Check Service Worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then(() => {
+        console.log("✅ Service Worker is ready")
+        setSwRegistered(true)
+      })
+    }
 
     return () => {
       window.removeEventListener("online", handleOnline)
       window.removeEventListener("offline", handleOffline)
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("pwa-install-available", handlePWAInstallAvailable)
+      window.removeEventListener("pwa-installed", handlePWAInstalled)
+      window.removeEventListener("pwa-already-installed", handlePWAAlreadyInstalled)
     }
   }, [])
 
   const handleInstallPWA = async () => {
     if (installPrompt) {
+      console.log("🚀 Triggering install prompt")
       installPrompt.prompt()
       const { outcome } = await installPrompt.userChoice
+      console.log("👤 User choice:", outcome)
+
       if (outcome === "accepted") {
+        setCanInstall(false)
         setInstallPrompt(null)
       }
+    } else {
+      console.log("❌ No install prompt available")
     }
   }
 
@@ -198,9 +220,19 @@ export default function QuitTracker() {
             <div className="flex items-center gap-2">
               {isOnline ? <Wifi className="w-5 h-5 text-green-600" /> : <WifiOff className="w-5 h-5 text-red-600" />}
               <span className="text-sm text-gray-600">{isOnline ? "Online" : "Offline"}</span>
+              {swRegistered && (
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full ml-2">SW Ready</span>
+              )}
+              {isInstalled && (
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full ml-2">
+                  <Smartphone className="w-3 h-3 inline mr-1" />
+                  Installed
+                </span>
+              )}
             </div>
-            {installPrompt && (
+            {canInstall && installPrompt && !isInstalled && (
               <Button onClick={handleInstallPWA} variant="outline" size="sm" className="text-xs">
+                <Download className="w-4 h-4 mr-1" />
                 Install App
               </Button>
             )}
