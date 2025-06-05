@@ -1,6 +1,7 @@
 {
   "name": "QuitTracker - Habit Quit Tracker",
   "short_name": "QuitTracker",
+  "version": "1.0.3",
   "description": "Track your journey to freedom from bad habits with this powerful habit tracking app",
   "start_url": "/",
   "display": "standalone",

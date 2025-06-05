@@ -45,9 +45,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
         {/* Favicons */}
         <link rel="icon" href="/favicon.png" type="image/svg+xml" />
@@ -72,7 +71,7 @@ export default function RootLayout({
           name="apple-mobile-web-app-status-bar-style"
           content="black-translucent"
         />
-        <meta name="apple-touch-fullscreen" content="yes" />{" "}
+        <meta name="apple-touch-fullscreen" content="yes" />
       </head>
       <body className={inter.className}>
         <ThemeProvider
@@ -81,120 +80,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          {children}{" "}
         </ThemeProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // PWA Service Worker Registration with better error handling
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('✅ SW registered successfully');
-                      console.log('📍 Scope: ', registration.scope);
-                      
-                      registration.addEventListener('updatefound', () => {
-                        console.log('🔄 SW update found');
-                        const newWorker = registration.installing;
-                        if (newWorker) {
-                          newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed') {
-                              console.log('🆕 New content available');
-                              if (navigator.serviceWorker.controller) {
-                                // Show update available notification
-                                console.log('🔄 Update available - reload to get latest version');
-                              }
-                            }
-                          });
-                        }
-                      });
-                    })
-                    .catch(function(registrationError) {
-                      console.error('❌ SW registration failed: ', registrationError);
-                    });
-                });
-                
-                // Handle service worker messages
-                navigator.serviceWorker.addEventListener('message', event => {
-                  console.log('📨 SW message:', event.data);
-                });
-                
-                // Handle service worker controller change
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                  console.log('🔄 SW controller changed - reloading page');
-                  window.location.reload();
-                });
-              }
-
-              // PWA Install Detection with debugging
-              let deferredPrompt;
-
-              window.addEventListener('beforeinstallprompt', (e) => {
-                console.log('🚀 beforeinstallprompt fired');
-                e.preventDefault();
-                deferredPrompt = e;
-
-                // Dispatch custom event
-                window.dispatchEvent(new CustomEvent('pwa-install-available', { detail: e }));
-              });
-
-              window.addEventListener('appinstalled', () => {
-                console.log('✅ PWA installed successfully');
-                deferredPrompt = null;
-                window.dispatchEvent(new CustomEvent('pwa-installed'));
-              });
-
-              // Check install status
-              function checkInstallStatus() {
-                const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-                const isInWebAppiOS = window.navigator.standalone === true;
-                const isInstalled = isStandalone || isInWebAppiOS;
-
-                if (isInstalled) {
-                  window.dispatchEvent(new CustomEvent('pwa-already-installed'));
-                }
-
-                return isInstalled;
-              }
-
-              // Check immediately
-              checkInstallStatus();
-
-              // Network status handling
-              window.addEventListener('online', () => {
-                console.log('🌐 Back online');
-                // Optionally reload to get fresh content
-                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                  navigator.serviceWorker.controller.postMessage({ type: 'NETWORK_ONLINE' });
-                }
-              });
-
-              window.addEventListener('offline', () => {
-                console.log('📱 Gone offline');
-                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                  navigator.serviceWorker.controller.postMessage({ type: 'NETWORK_OFFLINE' });
-                }
-              });
-
-              // Debug manifest
-              fetch('/manifest.json')
-                .then(response => {
-                  if (response.ok) {
-                    console.log('✅ Manifest loaded successfully');
-                    return response.json();
-                  }
-                  throw new Error('Manifest load failed');
-                })
-                .then(manifest => {
-                  console.log('📋 Manifest content:', manifest);
-                })
-                .catch(error => {
-                  console.error('❌ Manifest error:', error);
-                });
-            `,
-          }}
-        />
+        <script src="/pwa-manager.js" />
       </body>
     </html>
   );

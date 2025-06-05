@@ -9,6 +9,22 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  async headers() {
+    if (process.env.NODE_ENV === "development") {
+      return [
+        {
+          source: "/(.*)",
+          headers: [
+            {
+              key: "Cache-Control",
+              value: "no-cache, no-store, must-revalidate",
+            },
+          ],
+        },
+      ];
+    }
+    return [];
+  },
+};
 
-export default nextConfig
+export default nextConfig;

@@ -1,23 +1,28 @@
-const CACHE_NAME = "quittracker-v1.0.2"
-const STATIC_CACHE = "quittracker-static-v1.0.2"
-const DYNAMIC_CACHE = "quittracker-dynamic-v1.0.2"
+// Service Worker with modular configuration
+const CACHE_VERSION = "v1.0.4";
+const STATIC_CACHE = `quittracker-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `quittracker-dynamic-${CACHE_VERSION}`;
 
-// Files to cache immediately - pastikan semua file penting ada
+// Files to cache immediately
 const STATIC_FILES = [
   "/",
   "/manifest.json",
   "/logo.png",
   "/favicon.ico",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/pwa-manager.js",
+  "/pwa-config.js",
+  // Next.js specific files (these may change with builds)
   "/_next/static/css/app/layout.css",
   "/_next/static/chunks/webpack.js",
   "/_next/static/chunks/main-app.js",
   "/_next/static/chunks/app/layout.js",
   "/_next/static/chunks/app/page.js",
-]
+];
 
 // Offline fallback HTML
-const OFFLINE_HTML = `
-<!DOCTYPE html>
+const OFFLINE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -103,24 +108,23 @@ const OFFLINE_HTML = `
         }
     </script>
 </body>
-</html>
-`
+</html>`;
 
 // Install event - cache static files
 self.addEventListener("install", (event) => {
-  console.log("Service Worker: Installing v1.0.2...")
+  console.log(`Service Worker: Installing ${CACHE_VERSION}...`);
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
       .then((cache) => {
-        console.log("Service Worker: Caching static files")
+        console.log("Service Worker: Caching static files");
         // Cache offline fallback first
         cache.put(
           "/offline.html",
           new Response(OFFLINE_HTML, {
             headers: { "Content-Type": "text/html" },
-          }),
-        )
+          })
+        );
 
         // Try to cache static files, but don't fail if some are missing
         return Promise.allSettled(
@@ -128,29 +132,30 @@ self.addEventListener("install", (event) => {
             fetch(url)
               .then((response) => {
                 if (response.ok) {
-                  return cache.put(url, response)
+                  return cache.put(url, response);
                 }
-                console.warn(`Failed to cache: ${url}`)
+                console.warn(`Failed to cache: ${url}`);
               })
               .catch((err) => {
-                console.warn(`Failed to fetch for cache: ${url}`, err)
-              }),
-          ),
-        )
+                console.warn(`Failed to fetch for cache: ${url}`, err);
+              })
+          )
+        );
       })
       .then(() => {
-        console.log("Service Worker: Installation complete, skipping waiting")
-        return self.skipWaiting()
+        console.log("Service Worker: Installation complete, skipping waiting");
+        // Force the waiting service worker to become the active service worker
+        return self.skipWaiting();
       })
       .catch((error) => {
-        console.error("Service Worker: Install failed", error)
-      }),
-  )
-})
+        console.error("Service Worker: Install failed", error);
+      })
+  );
+});
 
 // Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
-  console.log("Service Worker: Activating v1.0.2...")
+  console.log(`Service Worker: Activating ${CACHE_VERSION}...`);
   event.waitUntil(
     caches
       .keys()
@@ -158,30 +163,31 @@ self.addEventListener("activate", (event) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
             if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-              console.log("Service Worker: Deleting old cache:", cacheName)
-              return caches.delete(cacheName)
+              console.log("Service Worker: Deleting old cache:", cacheName);
+              return caches.delete(cacheName);
             }
-          }),
-        )
+          })
+        );
       })
       .then(() => {
-        console.log("Service Worker: Claiming clients")
-        return self.clients.claim()
+        console.log("Service Worker: Claiming clients");
+        // Take control of all pages immediately
+        return self.clients.claim();
       })
       .catch((error) => {
-        console.error("Service Worker: Activate failed", error)
-      }),
-  )
-})
+        console.error("Service Worker: Activate failed", error);
+      })
+  );
+});
 
 // Fetch event - improved offline handling
 self.addEventListener("fetch", (event) => {
-  const { request } = event
-  const url = new URL(request.url)
+  const { request } = event;
+  const url = new URL(request.url);
 
   // Skip non-GET requests
   if (request.method !== "GET") {
-    return
+    return;
   }
 
   // Handle same-origin requests
@@ -191,94 +197,105 @@ self.addEventListener("fetch", (event) => {
         .match(request)
         .then((cachedResponse) => {
           if (cachedResponse) {
-            console.log("Service Worker: Serving from cache:", request.url)
-            return cachedResponse
+            console.log("Service Worker: Serving from cache:", request.url);
+            return cachedResponse;
           }
 
           // Not in cache, try to fetch from network
           return fetch(request)
             .then((networkResponse) => {
               // Check if response is valid
-              if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== "basic") {
+              if (
+                !networkResponse ||
+                networkResponse.status !== 200 ||
+                networkResponse.type !== "basic"
+              ) {
                 // If it's the main page and network failed, serve offline page
                 if (url.pathname === "/" || url.pathname === "/index.html") {
-                  return caches.match("/offline.html")
+                  return caches.match("/offline.html");
                 }
-                return networkResponse
+                return networkResponse;
               }
 
               // Clone the response for caching
-              const responseToCache = networkResponse.clone()
+              const responseToCache = networkResponse.clone();
 
               // Add to dynamic cache
               caches
                 .open(DYNAMIC_CACHE)
                 .then((cache) => {
-                  console.log("Service Worker: Caching new resource:", request.url)
-                  cache.put(request, responseToCache)
+                  console.log(
+                    "Service Worker: Caching new resource:",
+                    request.url
+                  );
+                  cache.put(request, responseToCache);
                 })
-                .catch((err) => console.warn("Failed to cache:", err))
+                .catch((err) => console.warn("Failed to cache:", err));
 
-              return networkResponse
+              return networkResponse;
             })
             .catch((error) => {
-              console.error("Service Worker: Fetch failed for", request.url, error)
+              console.error(
+                "Service Worker: Fetch failed for",
+                request.url,
+                error
+              );
 
               // Network failed - provide offline fallbacks
               if (url.pathname === "/" || url.pathname === "/index.html") {
                 // Serve offline page for main routes
                 return caches.match("/offline.html").then((offlineResponse) => {
                   if (offlineResponse) {
-                    return offlineResponse
+                    return offlineResponse;
                   }
                   // Last resort: create a basic offline response
                   return new Response(OFFLINE_HTML, {
                     headers: { "Content-Type": "text/html" },
-                  })
-                })
+                  });
+                });
               }
 
               // For other resources, try to find any cached version
               return caches.match("/").then((fallback) => {
                 if (fallback) {
-                  return fallback
+                  return fallback;
                 }
                 // Return a basic error response instead of null
                 return new Response("Offline - Resource not available", {
                   status: 503,
                   statusText: "Service Unavailable",
                   headers: { "Content-Type": "text/plain" },
-                })
-              })
-            })
+                });
+              });
+            });
         })
         .catch((error) => {
-          console.error("Service Worker: Cache match failed", error)
+          console.error("Service Worker: Cache match failed", error);
           // Return a basic response instead of letting it fail
           return new Response("Cache Error", {
             status: 500,
             statusText: "Internal Server Error",
             headers: { "Content-Type": "text/plain" },
-          })
-        }),
-    )
+          });
+        })
+    );
   }
-})
+});
 
 // Background sync
 self.addEventListener("sync", (event) => {
-  console.log("Service Worker: Background sync triggered")
+  console.log("Service Worker: Background sync triggered");
   if (event.tag === "background-sync") {
     event.waitUntil(
       // Handle background sync tasks
-      Promise.resolve(),
-    )
+      Promise.resolve()
+    );
   }
-})
+});
 
 // Push notifications
 self.addEventListener("push", (event) => {
-  console.log("Service Worker: Push received")
+  console.log("Service Worker: Push received");
   const options = {
     body: event.data ? event.data.text() : "QuitTracker notification",
     icon: "/logo.png",
@@ -288,16 +305,37 @@ self.addEventListener("push", (event) => {
       dateOfArrival: Date.now(),
       primaryKey: 1,
     },
-  }
+  };
 
-  event.waitUntil(self.registration.showNotification("QuitTracker", options))
-})
+  event.waitUntil(self.registration.showNotification("QuitTracker", options));
+});
 
 // Handle service worker errors
 self.addEventListener("error", (event) => {
-  console.error("Service Worker error:", event.error)
-})
+  console.error("Service Worker error:", event.error);
+});
 
 self.addEventListener("unhandledrejection", (event) => {
-  console.error("Service Worker unhandled rejection:", event.reason)
-})
+  console.error("Service Worker unhandled rejection:", event.reason);
+});
+
+// Handle messages from the main thread
+self.addEventListener("message", (event) => {
+  console.log("Service Worker: Message received", event.data);
+
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === "GET_VERSION") {
+    event.ports[0].postMessage({ version: CACHE_VERSION });
+  }
+
+  if (event.data && event.data.type === "NETWORK_ONLINE") {
+    console.log("Service Worker: Network is back online");
+    // Could trigger cache updates here
+  }
+
+  if (event.data && event.data.type === "NETWORK_OFFLINE") {
+    console.log("Service Worker: Network went offline");
+  }
+});
