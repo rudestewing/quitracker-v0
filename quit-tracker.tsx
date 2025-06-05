@@ -67,8 +67,11 @@ export default function QuitTracker() {
   }, [])
 
   const calculateTimeElapsed = (quitDate: string): TimeElapsed => {
+    // Parse the quit date as local time (user's timezone)
     const quit = new Date(quitDate)
-    const now = currentTime
+    const now = new Date()
+
+    // Calculate difference in milliseconds
     const diffMs = now.getTime() - quit.getTime()
 
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24))
@@ -82,13 +85,13 @@ export default function QuitTracker() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.name.trim() || !formData.quitDate) return
+    if (!formData.name.trim()) return
 
     const newItem: QuitItem = {
       id: editingItem?.id || Date.now().toString(),
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
-      quitDate: formData.quitDate,
+      quitDate: formData.quitDate || new Date().toISOString().slice(0, 16),
     }
 
     if (editingItem) {
@@ -178,13 +181,12 @@ export default function QuitTracker() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="quitDate">Quit Date *</Label>
+                    <Label htmlFor="quitDate">Quit Date</Label>
                     <Input
                       id="quitDate"
                       type="datetime-local"
                       value={formData.quitDate}
                       onChange={(e) => setFormData({ ...formData, quitDate: e.target.value })}
-                      required
                     />
                   </div>
                 </div>
