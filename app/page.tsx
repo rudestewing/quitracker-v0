@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import QuitTracker from "../quit-tracker"
+import TrackerApp from "../components/TrackerApp";
 
 export default function Page() {
-  return <QuitTracker />
+  return <TrackerApp />;
 }
