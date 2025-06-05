@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     title: "QuitTracker - Habit Quit Tracker",
     description: "Track your journey to freedom from bad habits",
   },
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export const viewport: Viewport = {
@@ -88,6 +88,10 @@ export default function RootLayout({
                           newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed') {
                               console.log('🆕 New content available');
+                              if (navigator.serviceWorker.controller) {
+                                // Show update available notification
+                                console.log('🔄 Update available - reload to get latest version');
+                              }
                             }
                           });
                         }
@@ -97,45 +101,69 @@ export default function RootLayout({
                       console.error('❌ SW registration failed: ', registrationError);
                     });
                 });
+                
+                // Handle service worker messages
+                navigator.serviceWorker.addEventListener('message', event => {
+                  console.log('📨 SW message:', event.data);
+                });
+                
+                // Handle service worker controller change
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                  console.log('🔄 SW controller changed - reloading page');
+                  window.location.reload();
+                });
               }
-              
+
               // PWA Install Detection with debugging
               let deferredPrompt;
-              
+
               window.addEventListener('beforeinstallprompt', (e) => {
                 console.log('🚀 beforeinstallprompt fired');
                 e.preventDefault();
                 deferredPrompt = e;
-                
+
                 // Dispatch custom event
                 window.dispatchEvent(new CustomEvent('pwa-install-available', { detail: e }));
               });
-              
+
               window.addEventListener('appinstalled', () => {
                 console.log('✅ PWA installed successfully');
                 deferredPrompt = null;
                 window.dispatchEvent(new CustomEvent('pwa-installed'));
               });
-              
+
               // Check install status
               function checkInstallStatus() {
                 const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
                 const isInWebAppiOS = window.navigator.standalone === true;
                 const isInstalled = isStandalone || isInWebAppiOS;
-                
-                console.log('📱 Install Status:', { isStandalone, isInWebAppiOS, isInstalled });
-                
+
                 if (isInstalled) {
                   window.dispatchEvent(new CustomEvent('pwa-already-installed'));
                 }
-                
+
                 return isInstalled;
               }
-              
-              // Check immediately and periodically
+
+              // Check immediately
               checkInstallStatus();
-              setInterval(checkInstallStatus, 5000);
-              
+
+              // Network status handling
+              window.addEventListener('online', () => {
+                console.log('🌐 Back online');
+                // Optionally reload to get fresh content
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                  navigator.serviceWorker.controller.postMessage({ type: 'NETWORK_ONLINE' });
+                }
+              });
+
+              window.addEventListener('offline', () => {
+                console.log('📱 Gone offline');
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                  navigator.serviceWorker.controller.postMessage({ type: 'NETWORK_OFFLINE' });
+                }
+              });
+
               // Debug manifest
               fetch('/manifest.json')
                 .then(response => {
