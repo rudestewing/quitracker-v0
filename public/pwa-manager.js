@@ -3,6 +3,8 @@ class PWAManager {
   constructor() {
     this.deferredPrompt = null;
     this.updateInterval = null;
+    this.serviceWorker = null;
+    this.updateAvailable = false;
     this.init();
   }
 
@@ -10,27 +12,54 @@ class PWAManager {
     if ("serviceWorker" in navigator) {
       this.registerServiceWorker();
       this.setupEventListeners();
+      this.setupUpdateListener();
       this.startUpdateChecker();
       this.checkInstallStatus();
       this.debugManifest();
     }
   }
-
   // Service Worker Registration
   registerServiceWorker() {
+    const isDevelopment =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.port === "3000" ||
+      window.location.hostname.includes("dev") ||
+      window.location.hostname.includes("local");
+
     const isProduction =
       window.location.hostname !== "localhost" &&
       window.location.hostname !== "127.0.0.1" &&
       !window.location.hostname.includes("vercel.app") &&
       window.location.protocol === "https:";
 
-    if (isProduction || localStorage.getItem("force-sw") === "true") {
+    // Always register in development for testing, but with different behavior
+    if (
+      isProduction ||
+      isDevelopment ||
+      localStorage.getItem("force-sw") === "true"
+    ) {
       window.addEventListener("load", () => {
+        // In development, clear all caches first
+        if (isDevelopment && "caches" in window) {
+          console.log("PWA Manager: Development mode - clearing all caches");
+          caches.keys().then((cacheNames) => {
+            return Promise.all(
+              cacheNames.map((cacheName) => {
+                console.log("PWA Manager: Deleting cache:", cacheName);
+                return caches.delete(cacheName);
+              })
+            );
+          });
+        }
+
         navigator.serviceWorker
           .register("/sw.js")
           .then((registration) => {
             console.log("✅ SW registered successfully");
             console.log("📍 Scope: ", registration.scope);
+            console.log("🔧 Development mode:", isDevelopment);
+            this.serviceWorker = registration;
 
             registration.addEventListener("updatefound", () => {
               console.log("🔄 SW update found");
@@ -40,6 +69,10 @@ class PWAManager {
                   if (newWorker.state === "installed") {
                     console.log("🆕 New content available");
                     if (navigator.serviceWorker.controller) {
+                      this.updateAvailable = true;
+                      window.dispatchEvent(
+                        new CustomEvent("pwa-update-available")
+                      );
                       this.showUpdateNotification();
                     }
                   }
@@ -66,12 +99,15 @@ class PWAManager {
       });
     }
   }
-
   // Event Listeners Setup
   setupEventListeners() {
     // Service worker messages
     navigator.serviceWorker.addEventListener("message", (event) => {
       console.log("📨 SW message:", event.data);
+      if (event.data && event.data.type === "UPDATE_AVAILABLE") {
+        this.updateAvailable = true;
+        window.dispatchEvent(new CustomEvent("pwa-update-available"));
+      }
     });
 
     // Service worker controller change
@@ -126,15 +162,68 @@ class PWAManager {
     });
   }
 
-  // Update Management
-  checkForUpdates() {
+  // Update Listener Setup
+  setupUpdateListener() {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistration().then((registration) => {
-        if (registration) {
-          registration.update();
-          console.log("🔄 Manually checking for updates...");
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        if (event.data && event.data.type === "UPDATE_AVAILABLE") {
+          this.updateAvailable = true;
+          window.dispatchEvent(new CustomEvent("pwa-update-available"));
         }
       });
+    }
+  }
+
+  // Update Management
+  async checkForUpdates() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          console.log("🔄 Checking for updates...");
+          await registration.update();
+
+          // Check if there's a waiting service worker
+          if (registration.waiting) {
+            this.updateAvailable = true;
+            window.dispatchEvent(new CustomEvent("pwa-update-available"));
+            return true;
+          } else {
+            window.dispatchEvent(new CustomEvent("pwa-no-update-available"));
+            return false;
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("❌ Error checking for updates:", error);
+      window.dispatchEvent(
+        new CustomEvent("pwa-update-error", { detail: error })
+      );
+      return false;
+    }
+  }
+
+  async applyUpdate() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && registration.waiting) {
+          // Tell the waiting service worker to skip waiting
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+
+          // Listen for the controlling change and reload
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            window.location.reload();
+          });
+
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("❌ Error applying update:", error);
+      return false;
     }
   }
 
@@ -296,4 +385,6 @@ window.pwaManager = new PWAManager();
 
 // Expose useful functions globally
 window.checkForUpdates = () => window.pwaManager.checkForUpdates();
+window.checkPWAUpdate = () => window.pwaManager.checkForUpdates();
+window.applyPWAUpdate = () => window.pwaManager.applyUpdate();
 window.installPWA = () => window.pwaManager.install();

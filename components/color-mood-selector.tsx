@@ -34,82 +34,88 @@ export function ColorMoodSelector({
 }: ColorMoodSelectorProps) {
   const { currentMood, setMood, availableMoods, colors } = useColorMood();
 
-  if (variant === "dropdown") {
-    return (
-      <div className={cn("w-full max-w-xs", className)}>
-        <Select
-          value={currentMood}
-          onValueChange={(value: ColorMood) => setMood(value)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">
-                  {availableMoods.find((m) => m.value === currentMood)?.emoji}
-                </span>
-                <span>
-                  {availableMoods.find((m) => m.value === currentMood)?.label}
-                </span>
-              </div>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {availableMoods.map((mood) => (
-              <SelectItem key={mood.value} value={mood.value}>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{mood.emoji}</span>
-                  <div className="flex flex-col">
-                    <span>{mood.label}</span>
-                    {showDescription && (
-                      <span className="text-xs text-muted-foreground">
-                        {mood.description}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  }
-
-  if (variant === "compact") {
-    return (
-      <div className={cn("flex gap-2 flex-wrap", className)}>
-        {availableMoods.map((mood) => (
-          <Button
-            key={mood.value}
-            variant={currentMood === mood.value ? "default" : "outline"}
-            size="sm"
-            onClick={() => setMood(mood.value)}
-            className="gap-2"
+  const renderMoods = React.useMemo(() => {
+    if (variant === "dropdown") {
+      return (
+        <div className={cn("w-full max-w-xs", className)}>
+          <Select
+            value={currentMood}
+            onValueChange={(value: ColorMood) => setMood(value)}
           >
-            <span className="text-sm">{mood.emoji}</span>
-            <span className="hidden sm:inline">{mood.label.split(" ")[0]}</span>
-          </Button>
-        ))}
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">
+                    {availableMoods.find((m) => m.value === currentMood)?.emoji}
+                  </span>
+                  <span>
+                    {availableMoods.find((m) => m.value === currentMood)?.label}
+                  </span>
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {availableMoods.map((mood) => (
+                <SelectItem key={mood.value} value={mood.value}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{mood.emoji}</span>
+                    <div className="flex flex-col">
+                      <span>{mood.label}</span>
+                      {showDescription && (
+                        <span className="text-xs text-muted-foreground">
+                          {mood.description}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (variant === "compact") {
+      return (
+        <div className={cn("flex gap-2 flex-wrap", className)}>
+          {availableMoods.map((mood) => (
+            <Button
+              key={mood.value}
+              variant={currentMood === mood.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMood(mood.value)}
+              className="gap-2"
+            >
+              <span className="text-sm">{mood.emoji}</span>
+              <span className="hidden sm:inline">
+                {mood.label.split(" ")[0]}
+              </span>
+            </Button>
+          ))}
+        </div>
+      );
+    }
+
+    // Grid variant (default)
+    return (
+      <div className={cn("w-full", className)}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {availableMoods.map((mood) => (
+            <MoodCard
+              key={mood.value}
+              mood={mood}
+              isSelected={currentMood === mood.value}
+              onSelect={() => setMood(mood.value)}
+              showDescription={showDescription}
+            />
+          ))}
+        </div>
       </div>
     );
-  }
+  }, [variant, className, showDescription]);
 
-  // Grid variant (default)
-  return (
-    <div className={cn("w-full", className)}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {availableMoods.map((mood) => (
-          <MoodCard
-            key={mood.value}
-            mood={mood}
-            isSelected={currentMood === mood.value}
-            onSelect={() => setMood(mood.value)}
-            showDescription={showDescription}
-          />
-        ))}
-      </div>
-    </div>
-  );
+  return <div>{renderMoods}</div>;
 }
 
 interface MoodCardProps {
@@ -188,21 +194,21 @@ function MoodCard({
     >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2">
             <span className="text-2xl">{mood.emoji}</span>
-            <CardTitle className="text-sm font-medium">{mood.label}</CardTitle>
+            <CardTitle className="text-xs font-medium">{mood.label}</CardTitle>
           </div>
-          {isSelected && (
+          {/* {isSelected && (
             <Badge variant="default" className="text-xs">
               Active
             </Badge>
-          )}
+          )} */}
         </div>
-        {showDescription && (
+        {/* {showDescription && (
           <CardDescription className="text-xs">
             {mood.description}
           </CardDescription>
-        )}
+        )} */}
       </CardHeader>
 
       <CardContent className="pt-0">
@@ -231,7 +237,7 @@ function MoodCard({
         </div>
 
         {/* Mini preview card */}
-        <div
+        {/* <div
           className="h-16 rounded-md border p-2 text-xs"
           style={{
             backgroundColor: previewColors.background.card,
@@ -246,7 +252,7 @@ function MoodCard({
               style={{ backgroundColor: previewColors.primary.main }}
             />
           </div>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   );

@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ColorMoodSelector } from "@/components/color-mood-selector";
+import { PWAStatus } from "@/components/pwa-status";
 import { useColorMood } from "@/hooks/use-color-mood";
 import { Settings } from "lucide-react";
 import {
@@ -394,33 +395,36 @@ export default function QuitTracker() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {" "}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
                     className="border-mood-border hover:bg-mood-hover focus:ring-2 focus:ring-mood-primary transition-all duration-200"
-                    aria-label="Change color mood"
+                    aria-label="Open settings"
                   >
                     <Settings className="w-4 h-4 mr-1" />
-                    Mood
+                    Settings
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 bg-background border-mood-border shadow-lg">
+                <PopoverContent className=" w-[200px] md:w-[500px] bg-background border-mood-border shadow-lg">
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-medium text-mood-text mb-2">
                         Color Mood
                       </h4>
                       <p className="text-sm text-mood-text-secondary mb-3">
-                        Current mood:{" "}
+                        Current mood:
                         <span className="capitalize font-medium text-mood-primary">
                           {currentMood}
                         </span>
                       </p>
                     </div>
-                    <ColorMoodSelector variant="grid" />
+                    <ColorMoodSelector variant="compact" />
+                    {/* PWA Status Section */}
+                    <div className="border-t pt-4">
+                      <PWAStatus />
+                    </div>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -436,7 +440,7 @@ export default function QuitTracker() {
                 </Button>
               )}
             </div>
-          </div>{" "}
+          </div>
           <h1 className="text-4xl font-bold text-mood-text mb-2">
             QuitTracker
           </h1>
@@ -448,7 +452,7 @@ export default function QuitTracker() {
               You're offline, but your data is saved locally!
             </p>
           )}
-        </header>{" "}
+        </header>
         <section
           className="flex justify-center mb-8"
           aria-label="Add new quit tracker"
@@ -596,7 +600,7 @@ export default function QuitTracker() {
                       )}
                     </div>
                   </div>
-                </div>{" "}
+                </div>
                 <DialogFooter>
                   <Button
                     type="button"
@@ -612,7 +616,7 @@ export default function QuitTracker() {
                   >
                     {editingItem ? "Update" : "Add"} Quit
                   </Button>
-                </DialogFooter>{" "}
+                </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
@@ -688,18 +692,18 @@ export default function QuitTracker() {
                             <div className="mb-1">
                               <span className="font-semibold">
                                 {timeElapsed.days}
-                              </span>{" "}
+                              </span>
                               day
                               {timeElapsed.days !== 1 ? "s" : ""} clean
                             </div>
                           )}
                           <div>
-                            Since{" "}
+                            Since
                             {dayjs(item.quitDate).format(
                               "MMM D, YYYY [at] h:mm A"
                             )}
                           </div>
-                        </div>{" "}
+                        </div>
                         {/* Benefit Display */}
                         {benefit && (
                           <div className="border-t border-mood-border pt-4">
@@ -727,7 +731,7 @@ export default function QuitTracker() {
                             <div className="text-xs text-mood-text-secondary">
                               {benefit.type === "time"
                                 ? `${benefit.dailyAmount} minutes/day`
-                                : `${item.benefitUnit}${benefit.dailyAmount}/day`}{" "}
+                                : `${item.benefitUnit}${benefit.dailyAmount}/day`}
                             </div>
                           </div>
                         )}

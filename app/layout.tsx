@@ -80,9 +80,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}{" "}
+          {children}
         </ThemeProvider>
         <script src="/pwa-manager.js" />
+        {/* Development cache clear utility - only loads in development */}
+        {process.env.NODE_ENV === "development" && (
+          <script src="/dev-cache-clear.js" />
+        )}
       </body>
     </html>
   );

@@ -1,7 +1,17 @@
 // Service Worker with modular configuration
-const CACHE_VERSION = "v1.0.4";
+const CACHE_VERSION = "v1.0.5";
 const STATIC_CACHE = `quittracker-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `quittracker-dynamic-${CACHE_VERSION}`;
+
+// Check if we're in development mode
+const isDevelopment =
+  self.location.hostname === "localhost" ||
+  self.location.hostname === "127.0.0.1" ||
+  self.location.port === "3000" ||
+  self.location.hostname.includes("dev") ||
+  self.location.hostname.includes("local");
+
+console.log("Service Worker: Development mode:", isDevelopment);
 
 // Files to cache immediately
 const STATIC_FILES = [
@@ -113,6 +123,13 @@ const OFFLINE_HTML = `<!DOCTYPE html>
 // Install event - cache static files
 self.addEventListener("install", (event) => {
   console.log(`Service Worker: Installing ${CACHE_VERSION}...`);
+
+  // Skip caching entirely in development
+  if (isDevelopment) {
+    console.log("Service Worker: Development mode - skipping cache");
+    return self.skipWaiting();
+  }
+
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
@@ -151,11 +168,52 @@ self.addEventListener("install", (event) => {
         console.error("Service Worker: Install failed", error);
       })
   );
+
+  // Notify all clients that an update is available
+  event.waitUntil(
+    self.clients.matchAll().then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({
+          type: "UPDATE_AVAILABLE",
+        });
+      });
+    })
+  );
+});
+
+// Listen for skip waiting message
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 // Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
   console.log(`Service Worker: Activating ${CACHE_VERSION}...`);
+
+  // In development, clear all caches
+  if (isDevelopment) {
+    console.log("Service Worker: Development mode - clearing all caches");
+    event.waitUntil(
+      caches
+        .keys()
+        .then((cacheNames) => {
+          return Promise.all(
+            cacheNames.map((cacheName) => {
+              console.log("Service Worker: Deleting cache:", cacheName);
+              return caches.delete(cacheName);
+            })
+          );
+        })
+        .then(() => {
+          console.log("Service Worker: All caches cleared, claiming clients");
+          return self.clients.claim();
+        })
+    );
+    return;
+  }
+
   event.waitUntil(
     caches
       .keys()
@@ -190,7 +248,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Handle same-origin requests
+  // In development mode, always fetch from network and never cache
+  if (isDevelopment) {
+    console.log(
+      "Service Worker: Development mode - bypassing cache for:",
+      request.url
+    );
+    event.respondWith(
+      fetch(request).catch((error) => {
+        console.log("Service Worker: Network fetch failed in dev mode:", error);
+        // Only provide offline fallback for main pages
+        if (url.pathname === "/" || url.pathname === "/index.html") {
+          return new Response(OFFLINE_HTML, {
+            headers: { "Content-Type": "text/html" },
+          });
+        }
+        throw error;
+      })
+    );
+    return;
+  }
+
+  // Handle same-origin requests (production caching logic)
   if (url.origin === location.origin) {
     event.respondWith(
       caches
