@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Plus, Edit2, Trash2, Calendar, Wifi, WifiOff, Download, Smartphone } from "lucide-react"
+import { Plus, Edit2, Trash2, Calendar, Wifi, WifiOff, Download, Smartphone, Clock, DollarSign } from "lucide-react"
 import dayjs from "dayjs"
 import duration from "dayjs/plugin/duration"
 import relativeTime from "dayjs/plugin/relativeTime"
@@ -26,12 +26,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface QuitItem {
   id: string
   name: string
   description?: string
   quitDate: string
+  benefitType?: "time" | "money"
+  benefitAmount?: number // per day
+  benefitUnit?: string // for time: "minutes" | "hours", for money: currency symbol
 }
 
 interface TimeElapsed {
@@ -39,6 +43,13 @@ interface TimeElapsed {
   hours: number
   minutes: number
   seconds: number
+}
+
+interface BenefitCalculation {
+  totalAmount: number
+  dailyAmount: number
+  unit: string
+  type: "time" | "money"
 }
 
 export default function QuitTracker() {
@@ -49,6 +60,9 @@ export default function QuitTracker() {
     name: "",
     description: "",
     quitDate: "",
+    benefitType: "" as "time" | "money" | "",
+    benefitAmount: "",
+    benefitUnit: "",
   })
   const [currentTime, setCurrentTime] = useState(dayjs())
   const [isOnline, setIsOnline] = useState(true)
@@ -56,6 +70,7 @@ export default function QuitTracker() {
   const [isInstalled, setIsInstalled] = useState(false)
   const [canInstall, setCanInstall] = useState(false)
   const [swRegistered, setSwRegistered] = useState(false)
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<QuitItem | null>(null)
 
   // Load items from localStorage on mount
   useEffect(() => {
@@ -158,6 +173,46 @@ export default function QuitTracker() {
     return { days, hours, minutes, seconds }
   }
 
+  const calculateBenefit = (item: QuitItem): BenefitCalculation | null => {
+    if (!item.benefitType || !item.benefitAmount) return null
+
+    const timeElapsed = calculateTimeElapsed(item.quitDate)
+    const totalDays = Math.max(0, timeElapsed.days + timeElapsed.hours / 24)
+
+    if (item.benefitType === "time") {
+      const dailyMinutes = item.benefitAmount
+      const totalMinutes = totalDays * dailyMinutes
+
+      if (totalMinutes >= 60) {
+        const hours = Math.floor(totalMinutes / 60)
+        const minutes = Math.floor(totalMinutes % 60)
+        return {
+          totalAmount: totalMinutes,
+          dailyAmount: dailyMinutes,
+          unit: hours > 0 ? `${hours}h ${minutes}m` : `${Math.floor(totalMinutes)}m`,
+          type: "time",
+        }
+      } else {
+        return {
+          totalAmount: totalMinutes,
+          dailyAmount: dailyMinutes,
+          unit: `${Math.floor(totalMinutes)}m`,
+          type: "time",
+        }
+      }
+    } else if (item.benefitType === "money") {
+      const totalAmount = totalDays * item.benefitAmount
+      return {
+        totalAmount,
+        dailyAmount: item.benefitAmount,
+        unit: `${item.benefitUnit || "$"}${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`,
+        type: "money",
+      }
+    }
+
+    return null
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -168,6 +223,9 @@ export default function QuitTracker() {
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
       quitDate: formData.quitDate || dayjs().format("YYYY-MM-DDTHH:mm"),
+      benefitType: formData.benefitType || undefined,
+      benefitAmount: formData.benefitAmount ? Number.parseFloat(formData.benefitAmount) : undefined,
+      benefitUnit: formData.benefitUnit || undefined,
     }
 
     if (editingItem) {
@@ -185,18 +243,26 @@ export default function QuitTracker() {
       name: item.name,
       description: item.description || "",
       quitDate: item.quitDate,
+      benefitType: item.benefitType || "",
+      benefitAmount: item.benefitAmount?.toString() || "",
+      benefitUnit: item.benefitUnit || "",
     })
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setItems(items.filter((item) => item.id !== id))
+  const handleDeleteClick = (item: QuitItem) => {
+    setDeleteConfirmItem(item)
   }
 
-  const resetForm = () => {
-    setFormData({ name: "", description: "", quitDate: "" })
-    setEditingItem(null)
-    setIsDialogOpen(false)
+  const handleConfirmDelete = () => {
+    if (deleteConfirmItem) {
+      setItems(items.filter((item) => item.id !== deleteConfirmItem.id))
+      setDeleteConfirmItem(null)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmItem(null)
   }
 
   const formatTimeElapsed = (time: TimeElapsed): string => {
@@ -209,6 +275,27 @@ export default function QuitTracker() {
     } else {
       return `${time.seconds}s`
     }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      quitDate: "",
+      benefitType: "",
+      benefitAmount: "",
+      benefitUnit: "",
+    })
+    setEditingItem(null)
+    setIsDialogOpen(false)
+  }
+
+  const handleBenefitTypeChange = (value: "time" | "money") => {
+    setFormData({
+      ...formData,
+      benefitType: value,
+      benefitUnit: value === "time" ? "minutes" : "$",
+    })
   }
 
   return (
@@ -250,7 +337,7 @@ export default function QuitTracker() {
                 Add New Quit
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingItem ? "Edit Quit" : "Add New Quit"}</DialogTitle>
                 <DialogDescription>
@@ -293,6 +380,64 @@ export default function QuitTracker() {
                       onChange={(e) => setFormData({ ...formData, quitDate: e.target.value })}
                     />
                   </div>
+
+                  {/* Benefit Tracking Section */}
+                  <div className="border-t pt-4">
+                    <Label className="text-sm font-medium text-gray-700 mb-3 block">Benefit Tracking (optional)</Label>
+                    <div className="grid gap-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="benefitType">Benefit Type</Label>
+                        <Select value={formData.benefitType} onValueChange={handleBenefitTypeChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select benefit type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="time">Time Saved</SelectItem>
+                            <SelectItem value="money">Money Saved</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {formData.benefitType && (
+                        <>
+                          <div className="grid gap-2">
+                            <Label htmlFor="benefitAmount">
+                              {formData.benefitType === "time" ? "Minutes per day" : "Amount per day"}
+                            </Label>
+                            <Input
+                              id="benefitAmount"
+                              type="number"
+                              step={formData.benefitType === "money" ? "0.01" : "1"}
+                              placeholder={formData.benefitType === "time" ? "e.g., 30" : "e.g., 15.00"}
+                              value={formData.benefitAmount}
+                              onChange={(e) => setFormData({ ...formData, benefitAmount: e.target.value })}
+                            />
+                          </div>
+
+                          {formData.benefitType === "money" && (
+                            <div className="grid gap-2">
+                              <Label htmlFor="benefitUnit">Currency</Label>
+                              <Select
+                                value={formData.benefitUnit}
+                                onValueChange={(value) => setFormData({ ...formData, benefitUnit: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select currency" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="$">USD ($)</SelectItem>
+                                  <SelectItem value="Rp">IDR (Rp)</SelectItem>
+                                  <SelectItem value="€">EUR (€)</SelectItem>
+                                  <SelectItem value="£">GBP (£)</SelectItem>
+                                  <SelectItem value="¥">JPY (¥)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={resetForm}>
@@ -319,6 +464,7 @@ export default function QuitTracker() {
               const timeElapsed = calculateTimeElapsed(item.quitDate)
               const isValid =
                 timeElapsed.days >= 0 && timeElapsed.hours >= 0 && timeElapsed.minutes >= 0 && timeElapsed.seconds >= 0
+              const benefit = calculateBenefit(item)
 
               return (
                 <Card key={item.id} className="relative group hover:shadow-lg transition-shadow">
@@ -338,7 +484,7 @@ export default function QuitTracker() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-red-600 hover:text-red-700"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => handleDeleteClick(item)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -350,7 +496,7 @@ export default function QuitTracker() {
                       <div className="text-3xl font-bold text-green-600 mb-2">
                         {isValid ? formatTimeElapsed(timeElapsed) : "Invalid date"}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 mb-4">
                         {isValid && timeElapsed.days > 0 && (
                           <div className="mb-1">
                             <span className="font-semibold">{timeElapsed.days}</span> day
@@ -359,6 +505,34 @@ export default function QuitTracker() {
                         )}
                         <div>Since {dayjs(item.quitDate).format("MMM D, YYYY [at] h:mm A")}</div>
                       </div>
+
+                      {/* Benefit Display */}
+                      {benefit && (
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            {benefit.type === "time" ? (
+                              <Clock className="w-4 h-4 text-blue-600" />
+                            ) : (
+                              <DollarSign className="w-4 h-4 text-green-600" />
+                            )}
+                            <span className="text-sm font-medium text-gray-700">
+                              {benefit.type === "time" ? "Time Saved" : "Money Saved"}
+                            </span>
+                          </div>
+                          <div
+                            className={`text-2xl font-bold mb-1 ${
+                              benefit.type === "time" ? "text-blue-600" : "text-green-600"
+                            }`}
+                          >
+                            {benefit.unit}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {benefit.type === "time"
+                              ? `${benefit.dailyAmount} minutes/day`
+                              : `${item.benefitUnit}${benefit.dailyAmount}/day`}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -366,6 +540,31 @@ export default function QuitTracker() {
             })}
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={!!deleteConfirmItem} onOpenChange={() => setDeleteConfirmItem(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-red-600">Delete Quit Tracker</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{deleteConfirmItem?.name}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={handleCancelDelete}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
