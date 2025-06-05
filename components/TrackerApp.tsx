@@ -1,25 +1,19 @@
-"use client";
+"use client"
 
-import type React from "react";
+import type React from "react"
 
-import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Calendar } from "lucide-react";
-import dayjs from "dayjs";
-import duration from "dayjs/plugin/duration";
-import relativeTime from "dayjs/plugin/relativeTime";
+import { useState, useEffect } from "react"
+import { Plus, Edit2, Trash2, Calendar, Wifi, WifiOff } from "lucide-react"
+import dayjs from "dayjs"
+import duration from "dayjs/plugin/duration"
+import relativeTime from "dayjs/plugin/relativeTime"
 
 // Extend dayjs with plugins
-dayjs.extend(duration);
-dayjs.extend(relativeTime);
+dayjs.extend(duration)
+dayjs.extend(relativeTime)
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -28,153 +22,207 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 interface QuitItem {
-  id: string;
-  name: string;
-  description?: string;
-  quitDate: string;
+  id: string
+  name: string
+  description?: string
+  quitDate: string
 }
 
 interface TimeElapsed {
-  days: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
 }
 
 export default function QuitTracker() {
-  const [items, setItems] = useState<QuitItem[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<QuitItem | null>(null);
+  const [items, setItems] = useState<QuitItem[]>([])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<QuitItem | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     quitDate: "",
-  });
-  const [currentTime, setCurrentTime] = useState(dayjs());
+  })
+  const [currentTime, setCurrentTime] = useState(dayjs())
+  const [isOnline, setIsOnline] = useState(true)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
 
   // Load items from localStorage on mount
   useEffect(() => {
-    const savedItems = localStorage.getItem("quitTrackerItems");
+    const savedItems = localStorage.getItem("quitTrackerItems")
     if (savedItems) {
-      setItems(JSON.parse(savedItems));
+      setItems(JSON.parse(savedItems))
     }
-  }, []);
+  }, [])
 
   // Save items to localStorage whenever items change
   useEffect(() => {
-    localStorage.setItem("quitTrackerItems", JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem("quitTrackerItems", JSON.stringify(items))
+  }, [items])
+
   // Update current time every second for live countdown
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(dayjs());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+      setCurrentTime(dayjs())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // PWA installation and online status
+  useEffect(() => {
+    // Register service worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          console.log("SW registered: ", registration)
+        })
+        .catch((registrationError) => {
+          console.log("SW registration failed: ", registrationError)
+        })
+    }
+
+    // Handle online/offline status
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener("online", handleOnline)
+    window.addEventListener("offline", handleOffline)
+
+    setIsOnline(navigator.onLine)
+
+    // Handle PWA install prompt
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault()
+      setInstallPrompt(e)
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+
+    return () => {
+      window.removeEventListener("online", handleOnline)
+      window.removeEventListener("offline", handleOffline)
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    }
+  }, [])
+
+  const handleInstallPWA = async () => {
+    if (installPrompt) {
+      installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      if (outcome === "accepted") {
+        setInstallPrompt(null)
+      }
+    }
+  }
+
   const calculateTimeElapsed = (quitDate: string): TimeElapsed => {
-    const quit = dayjs(quitDate);
-    const now = currentTime;
-    const diff = dayjs.duration(now.diff(quit));
+    const quit = dayjs(quitDate)
+    const now = currentTime
+    const diff = dayjs.duration(now.diff(quit))
 
-    const days = Math.floor(diff.asDays());
-    const hours = diff.hours();
-    const minutes = diff.minutes();
-    const seconds = diff.seconds();
+    const days = Math.floor(diff.asDays())
+    const hours = diff.hours()
+    const minutes = diff.minutes()
+    const seconds = diff.seconds()
 
-    return { days, hours, minutes, seconds };
-  };
+    return { days, hours, minutes, seconds }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim()) return
 
     const newItem: QuitItem = {
       id: editingItem?.id || Date.now().toString(),
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
       quitDate: formData.quitDate || dayjs().format("YYYY-MM-DDTHH:mm"),
-    };
-
-    if (editingItem) {
-      setItems(
-        items.map((item) => (item.id === editingItem.id ? newItem : item))
-      );
-    } else {
-      setItems([...items, newItem]);
     }
 
-    resetForm();
-  };
+    if (editingItem) {
+      setItems(items.map((item) => (item.id === editingItem.id ? newItem : item)))
+    } else {
+      setItems([...items, newItem])
+    }
+
+    resetForm()
+  }
 
   const handleEdit = (item: QuitItem) => {
-    setEditingItem(item);
+    setEditingItem(item)
     setFormData({
       name: item.name,
       description: item.description || "",
       quitDate: item.quitDate,
-    });
-    setIsDialogOpen(true);
-  };
+    })
+    setIsDialogOpen(true)
+  }
 
   const handleDelete = (id: string) => {
-    setItems(items.filter((item) => item.id !== id));
-  };
+    setItems(items.filter((item) => item.id !== id))
+  }
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", quitDate: "" });
-    setEditingItem(null);
-    setIsDialogOpen(false);
-  };
+    setFormData({ name: "", description: "", quitDate: "" })
+    setEditingItem(null)
+    setIsDialogOpen(false)
+  }
 
   const formatTimeElapsed = (time: TimeElapsed): string => {
     if (time.days > 0) {
-      return `${time.days}d ${time.hours}h ${time.minutes}m ${time.seconds}s`;
+      return `${time.days}d ${time.hours}h ${time.minutes}m ${time.seconds}s`
     } else if (time.hours > 0) {
-      return `${time.hours}h ${time.minutes}m ${time.seconds}s`;
+      return `${time.hours}h ${time.minutes}m ${time.seconds}s`
     } else if (time.minutes > 0) {
-      return `${time.minutes}m ${time.seconds}s`;
+      return `${time.minutes}m ${time.seconds}s`
     } else {
-      return `${time.seconds}s`;
+      return `${time.seconds}s`
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
       <div className="max-w-screen-md mx-auto">
+        {/* Header with status indicators */}
         <div className="text-center mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              {isOnline ? <Wifi className="w-5 h-5 text-green-600" /> : <WifiOff className="w-5 h-5 text-red-600" />}
+              <span className="text-sm text-gray-600">{isOnline ? "Online" : "Offline"}</span>
+            </div>
+            {installPrompt && (
+              <Button onClick={handleInstallPWA} variant="outline" size="sm" className="text-xs">
+                Install App
+              </Button>
+            )}
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">QuitTracker</h1>
-          <p className="text-gray-600">
-            Track your journey to freedom from bad habits
-          </p>
+          <p className="text-gray-600">Track your journey to freedom from bad habits</p>
+          {!isOnline && <p className="text-sm text-amber-600 mt-2">You're offline, but your data is saved locally!</p>}
         </div>
 
         <div className="flex justify-center mb-8">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button
-                onClick={() => resetForm()}
-                className="bg-green-600 hover:bg-green-700"
-              >
+              <Button onClick={() => resetForm()} className="bg-green-600 hover:bg-green-700">
                 <Plus className="w-4 h-4 mr-2" />
                 Add New Quit
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>
-                  {editingItem ? "Edit Quit" : "Add New Quit"}
-                </DialogTitle>
+                <DialogTitle>{editingItem ? "Edit Quit" : "Add New Quit"}</DialogTitle>
                 <DialogDescription>
-                  {editingItem
-                    ? "Update your quit details."
-                    : "Add a new habit you want to track quitting."}
+                  {editingItem ? "Update your quit details." : "Add a new habit you want to track quitting."}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit}>
@@ -185,9 +233,7 @@ export default function QuitTracker() {
                       id="name"
                       placeholder="e.g., Smoking, Social Media, Coffee..."
                       value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
                   </div>
@@ -212,9 +258,7 @@ export default function QuitTracker() {
                       id="quitDate"
                       type="datetime-local"
                       value={formData.quitDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, quitDate: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, quitDate: e.target.value })}
                     />
                   </div>
                 </div>
@@ -222,10 +266,7 @@ export default function QuitTracker() {
                   <Button type="button" variant="outline" onClick={resetForm}>
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    className="bg-green-600 hover:bg-green-700"
-                  >
+                  <Button type="submit" className="bg-green-600 hover:bg-green-700">
                     {editingItem ? "Update" : "Add"} Quit
                   </Button>
                 </DialogFooter>
@@ -237,47 +278,28 @@ export default function QuitTracker() {
         {items.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
-              No quits tracked yet
-            </h3>
-            <p className="text-gray-500">
-              Add your first quit to start tracking your progress!
-            </p>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No quits tracked yet</h3>
+            <p className="text-gray-500">Add your first quit to start tracking your progress!</p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {items.map((item) => {
-              const timeElapsed = calculateTimeElapsed(item.quitDate);
+              const timeElapsed = calculateTimeElapsed(item.quitDate)
               const isValid =
-                timeElapsed.days >= 0 &&
-                timeElapsed.hours >= 0 &&
-                timeElapsed.minutes >= 0 &&
-                timeElapsed.seconds >= 0;
+                timeElapsed.days >= 0 && timeElapsed.hours >= 0 && timeElapsed.minutes >= 0 && timeElapsed.seconds >= 0
 
               return (
-                <Card
-                  key={item.id}
-                  className="relative group hover:shadow-lg transition-shadow"
-                >
+                <Card key={item.id} className="relative group hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <CardTitle className="text-lg font-semibold text-gray-900 mb-1">
-                          {item.name}
-                        </CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-900 mb-1">{item.name}</CardTitle>
                         {item.description && (
-                          <CardDescription className="text-sm text-gray-600">
-                            {item.description}
-                          </CardDescription>
+                          <CardDescription className="text-sm text-gray-600">{item.description}</CardDescription>
                         )}
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(item)}
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(item)}>
                           <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button
@@ -294,35 +316,25 @@ export default function QuitTracker() {
                   <CardContent>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-green-600 mb-2">
-                        {isValid
-                          ? formatTimeElapsed(timeElapsed)
-                          : "Invalid date"}
+                        {isValid ? formatTimeElapsed(timeElapsed) : "Invalid date"}
                       </div>
                       <div className="text-sm text-gray-500">
                         {isValid && timeElapsed.days > 0 && (
                           <div className="mb-1">
-                            <span className="font-semibold">
-                              {timeElapsed.days}
-                            </span>{" "}
-                            day
+                            <span className="font-semibold">{timeElapsed.days}</span> day
                             {timeElapsed.days !== 1 ? "s" : ""} clean
                           </div>
-                        )}{" "}
-                        <div>
-                          Since{" "}
-                          {dayjs(item.quitDate).format(
-                            "MMM D, YYYY [at] h:mm A"
-                          )}
-                        </div>
+                        )}
+                        <div>Since {dayjs(item.quitDate).format("MMM D, YYYY [at] h:mm A")}</div>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              );
+              )
             })}
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
